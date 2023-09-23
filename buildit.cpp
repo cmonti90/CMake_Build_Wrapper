@@ -1,13 +1,18 @@
+#include "buildit.h"
+
 #include <cstdlib>
 #include <stdexcept>
 #include <cstring>
 #include <iostream>
-#include <vector>
 
-int main(int agrc, char *argv[])
+int main(int argc, char *argv[])
 {
-    (void)agrc;
+    (void)argc;
     (void)argv;
+
+    std::vector<std::string> parsedArgs;
+
+    parseArgs(argc, argv, parsedArgs); 
 
     const char *buildDir = std::getenv("SIM_DIR");
 
@@ -28,4 +33,23 @@ int main(int agrc, char *argv[])
     system(cmd.c_str());
 
     return 0;
+}
+
+void parseArgs(const int argc, const char* argv, std::vector<std::string> &parsedArgs)
+{
+    std::string arg;
+    bool argPopulated{false};
+    bool isStr{false};
+    bool isChar{false};
+
+    for (int i = 0; i < argc; ++i)
+    {
+        while (argv[i] != ' ' || isStr || isChar)
+        {
+            arg.push_back(argv[i]);
+            ++i;
+        }
+
+        parsedArgs.push_back(arg);
+    }
 }
