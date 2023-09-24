@@ -8,8 +8,9 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <sys/stat.h>
 
-void parseArgs(const int argc, const char *argv[])
+void parseArgs( const int argc, const char* argv[] )
 {
     std::string arg;
     bool argPopulated{false};
@@ -18,207 +19,318 @@ void parseArgs(const int argc, const char *argv[])
 
     int j{0};
 
-    for (int i = 1; i < argc; ++i)
+    for ( int i = 1; i < argc; ++i )
     {
-        if (std::string(argv[i]) == "-c")
+        if ( std::string( argv[i] ) == "-c" )
         {
             buildMode = BuildMode::Configure;
             continue;
         }
-        else if (std::string(argv[i]) == "-cr")
+        else if ( std::string( argv[i] ) == "-cr" )
         {
             buildMode = BuildMode::Configure;
             buildType = "Release";
             continue;
         }
-        else if (std::string(argv[i]) == "-cd")
+        else if ( std::string( argv[i] ) == "-cd" )
         {
             buildMode = BuildMode::Configure;
             buildType = "Debug";
             continue;
         }
-        else if (std::string(argv[i]) == "-j")
+        else if ( std::string( argv[i] ) == "-j" )
         {
             buildMode = BuildMode::Build;
             continue;
         }
-        else if (std::string(argv[i]) == "-m")
+        else if ( std::string( argv[i] ) == "-m" )
         {
             buildMode = BuildMode::Clean;
             continue;
         }
-        else if (std::string(argv[i]) == "-h")
+        else if ( std::string( argv[i] ) == "-h" )
         {
-            buildMode = BuildMode::Help;
+            printHelp();
             continue;
         }
-        else if (std::string(argv[i]) == "-s")
+        else if ( std::string( argv[i] ) == "-s" )
         {
-            sourceDir = std::string(argv[++i]);
+            sourceDir = std::string( argv[++i] );
             continue;
         }
-        else if (std::string(argv[i]) == "-b")
+        else if ( std::string( argv[i] ) == "-b" )
         {
-            buildDir = std::string(argv[++i]);
+            buildDir = std::string( argv[++i] );
             continue;
         }
-        else if (std::string(argv[i]) == "-v")
+        else if ( std::string( argv[i] ) == "-v" )
         {
             std::cout << "buildit version 0.1" << std::endl;
-            exit(0);
+            exit( 0 );
         }
         else
         {
-            buildXtraArgs += std::string(argv[i]) + " ";
+            buildXtraArgs += std::string( argv[i] ) + " ";
         }
     }
 }
 
-int main(const int argc, const char *argv[])
+int main( const int argc, const char* argv[] )
 {
-    sourceDir = trim(std::string(std::getenv("SIM_DIR")));
-
-    if (sourceDir.empty())
+    try
     {
-        const char *err_msg = "SIM_DIR environment variable not set";
-        throw std::runtime_error(err_msg);
+        sourceDir = trim( std::string( std::getenv( "SIM_DIR" ) ) );
     }
-    else if (sourceDir.back() == '/')
+    catch ( ... )
     {
-        sourceDir.pop_back();
+        sourceDir = "";
     }
 
     buildMode = BuildMode::Unset;
     buildType = "Release";
     buildDir = sourceDir + "/build/";
 
-    parseArgs(argc, argv);
+    parseArgs( argc, argv );
+
+    if ( sourceDir.empty() )
+    {
+        const char* err_msg = "SIM_DIR environment variable not set";
+        throw std::runtime_error( err_msg );
+    }
+    else if ( sourceDir.back() != '/' )
+    {
+        sourceDir.append( "/" );
+    }
+
+    if ( buildDir.back() != '/' )
+    {
+        buildDir.push_back( '/' );
+    }
+
+    buildDir += buildType + "/";
 
     std::string cmd;
 
-    switch (buildMode)
+    switch ( buildMode )
     {
-    case BuildMode::Configure:
-    {
-        std::cout << "sourceDir = " << sourceDir << std::endl;
+        case BuildMode::Configure:
+            {
+                createBuildFile( sourceDir );
 
-        createBuildFile(sourceDir);
+                cmd = "cmake -S " + sourceDir + " -B " + buildDir + " -DCMAKE_BUILD_TYPE=" + buildType + " " + buildXtraArgs;
 
-        cmd = "cmake -S " + sourceDir + " -B " + buildDir + buildType + " -DCMAKE_BUILD_TYPE=" + buildType + " " + buildXtraArgs;
-        system(cmd.c_str());
+                std::cout << "Command: " << cmd << std::endl;
 
-        break;
-    }
-    case BuildMode::Build:
-    {
-        if (buildFileExists(sourceDir))
-        {
-            readBuildFile(sourceDir);
-        }
-        else
-        {
-            createBuildFile(sourceDir);
-        }
+                system( cmd.c_str() );
 
-        cmd = "cmake --build " + buildDir + buildType + " " + buildXtraArgs;
+                break;
+            }
+        case BuildMode::Build:
+            {
+                if ( buildFileExists( sourceDir ) )
+                {
+                    readBuildFile( sourceDir );
+                }
+                else
+                {
+                    createBuildFile( sourceDir );
+                }
 
-        std::cout << "Building: " << cmd << std::endl;
+                cmd = "cmake --build " + buildDir + " " + buildXtraArgs;
 
-        system(cmd.c_str());
+                std::cout << "Command: " << cmd << std::endl;
 
-        break;
-    }
-    case BuildMode::Clean:
-    {
-        if (buildDir != "/" && !buildDir.empty())
-        {
-            std::cout << "Clearing build directory: " << buildDir << std::endl;
+                system( cmd.c_str() );
 
-            cmd = "rm -rf " + buildDir;
-            system(cmd.c_str());
-        }
+                createRunitExec();
+                createSimLinksToRunitExec();
+                createConfigFile();
 
-        break;
-    }
-    case BuildMode::Help:
-    {
-        std::cout << "buildit -c -cr -cd -j -m -h -s -b -v" << std::endl;
-        std::cout << "  -c: configure (release is default)" << std::endl;
-        std::cout << "  -cr: configure release" << std::endl;
-        std::cout << "  -cd: configure debug" << std::endl;
-        std::cout << "  -j: build" << std::endl;
-        std::cout << "  -m: clean" << std::endl;
-        std::cout << "  -h: help" << std::endl;
-        std::cout << "  -s: source directory" << std::endl;
-        std::cout << "  -b: build directory" << std::endl;
-        std::cout << "  -v: version" << std::endl;
+                break;
+            }
+        case BuildMode::Clean:
+            {
+                if ( buildDir != "/" && !buildDir.empty() )
+                {
+                    std::cout << "Clearing build directory: " << buildDir << std::endl;
 
-        break;
-    }
-    case BuildMode::Unset:
-    default:
-    {
-        const char *err_msg = "-c or -m or -j needs to be provided";
-        throw std::runtime_error(err_msg);
-        break;
-    }
+                    cmd = "rm -rf " + buildDir;
+                    system( cmd.c_str() );
+                }
+
+                break;
+            }
+        case BuildMode::Unset:
+        default:
+            {
+                const char* err_msg = "-c or -m or -j needs to be provided";
+                throw std::runtime_error( err_msg );
+                break;
+            }
     }
 
     return 0;
 }
 
-bool buildFileExists(const std::string &dir)
+bool buildFileExists( const std::string& dir )
 {
-    std::string buildFile = dir + "/.buildit.build";
+    std::string buildFile = dir + ".buildit.build";
 
-    return std::filesystem::exists(std::filesystem::path(buildFile));
+    return std::filesystem::exists( std::filesystem::path( buildFile ) );
 }
 
-void createBuildFile(const std::string &dir)
+void createBuildFile( const std::string& dir )
 {
-    std::string buildFile = dir + "/.buildit.build";
+    std::string buildFile = dir + ".buildit.build";
 
-    std::ofstream ofs(buildFile, std::ofstream::out);
+    std::ofstream ofs( buildFile, std::ofstream::out );
 
-    ofs << "buildMode = " << static_cast<unsigned int>(buildMode) << std::endl;
+    ofs << "buildMode = " << static_cast<unsigned int>( buildMode ) << std::endl;
     ofs << "buildType = " << buildType << std::endl;
     ofs << "sourceDir = " << sourceDir << std::endl;
     ofs << "buildDir = " << buildDir << std::endl;
 
-    std::cout << "buildMode = " << static_cast<unsigned int>(buildMode) << std::endl;
+    std::cout << "buildMode = " << static_cast<unsigned int>( buildMode ) << std::endl;
     std::cout << "buildType = " << buildType << std::endl;
     std::cout << "sourceDir = " << sourceDir << std::endl;
     std::cout << "buildDir = " << buildDir << std::endl;
 
     ofs.close();
 }
-void readBuildFile(const std::string &dir)
-{
-    std::string buildFile = dir + "/.buildit.build";
 
-    std::ifstream ifs(buildFile, std::ifstream::in);
+void readBuildFile( const std::string& dir )
+{
+    std::string buildFile = dir + ".buildit.build";
+
+    std::ifstream ifs( buildFile, std::ifstream::in );
 
     std::string line;
 
-    std::getline(ifs, line);
-    buildMode = static_cast<BuildMode>(std::stoi(line.substr(line.find("=") + 1)));
+    std::getline( ifs, line );
+    buildMode = static_cast<BuildMode>( std::stoi( line.substr( line.find( "=" ) + 1 ) ) );
 
-    std::getline(ifs, line);
-    buildType = trim(line.substr(line.find("=") + 1));
+    std::getline( ifs, line );
+    buildType = trim( line.substr( line.find( "=" ) + 1 ) );
 
-    std::getline(ifs, line);
+    std::getline( ifs, line );
     // sourceDir = trim(line.substr(line.find("=") + 1));
 
-    std::getline(ifs, line);
-    buildDir = trim(line.substr(line.find("=") + 1));
+    std::getline( ifs, line );
+    buildDir = trim( line.substr( line.find( "=" ) + 1 ) );
+
+    if ( buildDir.back() != '/' )
+    {
+        buildDir.push_back( '/' );
+    }
 
     ifs.close();
 }
 
-std::string trim(const std::string &line)
+std::string trim( const std::string& line )
 {
-    const char *WhiteSpace = " \t\v\r\n";
-    std::size_t start = line.find_first_not_of(WhiteSpace);
-    std::size_t end = line.find_last_not_of(WhiteSpace);
-    return start == end ? std::string() : line.substr(start, end - start + 1);
+    const char* WhiteSpace = " \t\v\r\n";
+    std::size_t start = line.find_first_not_of( WhiteSpace );
+    std::size_t end = line.find_last_not_of( WhiteSpace );
+    return start == end ? std::string() : line.substr( start, end - start + 1 );
+}
+
+void printHelp()
+{
+    std::cout << "buildit -c -cr -cd -j -m -h -s -b -v" << std::endl;
+    std::cout << "  -c: configure (release is default)" << std::endl;
+    std::cout << "  -cr: configure release" << std::endl;
+    std::cout << "  -cd: configure debug" << std::endl;
+    std::cout << "  -j: build" << std::endl;
+    std::cout << "  -m: clean" << std::endl;
+    std::cout << "  -h: help" << std::endl;
+    std::cout << "  -s: source directory" << std::endl;
+    std::cout << "  -b: build directory" << std::endl;
+    std::cout << "  -v: version" << std::endl;
+}
+
+void createRunitExec()
+{
+    execDir = buildDir + "config/";
+    std::string runitExec = execDir + "runit.cpp";
+    std::string cmd;
+
+    if ( !std::filesystem::exists( std::filesystem::path( execDir ) ) )
+    {
+        cmd = "mkdir " + execDir;
+        system( cmd.c_str() );
+    }
+
+    std::ofstream ofs( runitExec, std::ofstream::out );
+
+    ofs << "#include <string>" << std::endl << std::endl;
+    ofs << "int main(const int argc, const char* argv[])" << std::endl << std::endl;
+    ofs << "{" << std::endl;
+    ofs << "std::string cmd;" << std::endl;
+    ofs << "cmd = \"python " << sourceDir << "Sim/Runner/runit.py \";" << std::endl;
+    ofs << "for ( unsigned int i{1u}; i < argc; ++i )" << std::endl;
+    ofs << "{" << std::endl;
+    ofs << "\tcmd += std::string(argv[i]) + \" \";" << std::endl;
+    ofs << "}" << std::endl;
+    ofs << std::endl;
+    ofs << "system(cmd.c_str());" << std::endl;
+    ofs << "return 0;" << std::endl;
+    ofs << "}" << std::endl;
+
+    ofs.close();
+
+    cmd = "g++ -std=c++17 -o " + execDir + "runit " + runitExec;
+    system( cmd.c_str() );
+
+    cmd = "rm -f " + runitExec;
+    system( cmd.c_str() );
+
+}
+
+void createSimLinksToRunitExec()
+{
+    std::string pwd = std::getenv( "PWD" );
+    std::string oldpwd = std::getenv( "OLDPWD" );
+
+    std::string cmd;
+
+    if ( !std::filesystem::exists( std::filesystem::path( sourceDir + "Sim/config" ) ) )
+    {
+        cmd = "mkdir " + sourceDir + "Sim/config";
+
+        std::cout << "Command: " << cmd << std::endl;
+
+        system( cmd.c_str() );
+    }
+
+    cmd = "cd " + sourceDir + "Sim/config";
+    system( cmd.c_str() );
+
+    if ( lstat( ( sourceDir + "Sim/config/exec" ).c_str(), nullptr ) == 0 )
+    {
+        cmd = "rm -f " + sourceDir + "Sim/config/exec";
+        system( cmd.c_str() );
+    }
+
+    cmd = "ln -s " + execDir + " ./exec";
+    system( cmd.c_str() );
+
+
+    cmd = "cd " + pwd + "; export OLDPWD=" + oldpwd;
+    system( cmd.c_str() );
+}
+
+void createConfigFile()
+{
+    std::string configFile = buildDir + "config/config.sh";
+    std::string cmd;
+
+    std::ofstream ofs( configFile, std::ofstream::out );
+
+    ofs << "#!/bin/bash" << std::endl;
+    ofs << "PATH=${PATH/\"" << sourceDir << "Sim/config:\"/}" << std::endl;
+
+    ofs << "echo \"Prending to PATH: " << sourceDir << "Sim/config\"" << std::endl;
+    ofs << "export PATH=\"" << sourceDir << "Sim/config:${PATH}\"" << std::endl;
+
+    ofs.close();
 }
