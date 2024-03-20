@@ -8,7 +8,6 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
-#include <sys/stat.h>
 
 void parseArgs( const int argc, const char* argv[] )
 {
@@ -117,7 +116,7 @@ int main( const int argc, const char* argv[] )
             {
                 createBuildFile( sourceDir );
 
-                cmd = "cmake -S " + sourceDir + " -B " + buildDir + " -DCMAKE_BUILD_TYPE=" + buildType + " " + buildXtraArgs;
+                cmd = "cmake -S " + sourceDir + " -B " + buildDir + " -DCMAKE_BUILD_TYPE=" + buildType + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON " + buildXtraArgs;
 
                 std::cout << "Command: " << cmd << std::endl;
 
@@ -136,7 +135,7 @@ int main( const int argc, const char* argv[] )
                     createBuildFile( sourceDir );
                 }
 
-                cmd = "cmake --build " + buildDir + " " + buildXtraArgs;
+                cmd = "cmake --build " + buildDir + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON " + buildXtraArgs;
 
                 std::cout << "Command: " << cmd << std::endl;
 
@@ -150,13 +149,10 @@ int main( const int argc, const char* argv[] )
             }
         case BuildMode::Clean:
             {
-                if ( buildDir != "/" && !buildDir.empty() )
-                {
-                    std::cout << "Clearing build directory: " << buildDir << std::endl;
+                    std::cout << "Clearing build directory: " << sourceDir << "build/" << std::endl;
 
-                    cmd = "rm -rf " + buildDir;
+                    cmd = "rm -rf " + sourceDir + "build/";
                     system( cmd.c_str() );
-                }
 
                 break;
             }
@@ -266,7 +262,7 @@ void createRunitExec()
     ofs << "int main(const int argc, const char* argv[])" << std::endl << std::endl;
     ofs << "{" << std::endl;
     ofs << "std::string cmd;" << std::endl;
-    ofs << "cmd = \"python " << sourceDir << "Sim/Runner/runit.py \";" << std::endl;
+    ofs << "cmd = \"python3.9 " << sourceDir << "Sim/Runner/runit.py \";" << std::endl;
     ofs << "for ( unsigned int i{1u}; i < argc; ++i )" << std::endl;
     ofs << "{" << std::endl;
     ofs << "\tcmd += std::string(argv[i]) + \" \";" << std::endl;
@@ -288,34 +284,33 @@ void createRunitExec()
 
 void createSimLinksToRunitExec()
 {
-    std::string pwd = std::getenv( "PWD" );
-    std::string oldpwd = std::getenv( "OLDPWD" );
-
     std::string cmd;
 
-    if ( !std::filesystem::exists( std::filesystem::path( sourceDir + "Sim/config" ) ) )
+    std::string configDir = sourceDir + "Sim/config/";
+
+    if ( !std::filesystem::exists( std::filesystem::path( configDir ) ) )
     {
         cmd = "mkdir " + sourceDir + "Sim/config";
 
-        std::cout << "Command: " << cmd << std::endl;
-
         system( cmd.c_str() );
     }
 
-    cmd = "cd " + sourceDir + "Sim/config";
-    system( cmd.c_str() );
-
-    if ( lstat( ( sourceDir + "Sim/config/exec" ).c_str(), nullptr ) == 0 )
+    if ( std::filesystem::is_symlink( ( configDir + "exec" ).c_str()))
     {
-        cmd = "rm -f " + sourceDir + "Sim/config/exec";
+        cmd = "rm -f " + configDir + "exec";
         system( cmd.c_str() );
     }
 
-    cmd = "ln -s " + execDir + " ./exec";
+    cmd = "ln -s " + execDir + " " + configDir + "exec";
     system( cmd.c_str() );
 
+    if ( std::filesystem::is_symlink( ( buildDir + "config/runnerLink" ).c_str()))
+    {
+        cmd = "rm -f " + buildDir + "config/runnerLink";
+        system( cmd.c_str() );
+    }
 
-    cmd = "cd " + pwd + "; export OLDPWD=" + oldpwd;
+    cmd = "ln -s " + buildDir + "/Sim/Runner/runner " + buildDir + "config/runnerLink";
     system( cmd.c_str() );
 }
 
@@ -327,10 +322,10 @@ void createConfigFile()
     std::ofstream ofs( configFile, std::ofstream::out );
 
     ofs << "#!/bin/bash" << std::endl;
-    ofs << "PATH=${PATH/\"" << sourceDir << "Sim/config:\"/}" << std::endl;
+    ofs << "PATH=${PATH/\"" << sourceDir << "Sim/config/exec:\"/}" << std::endl;
 
-    ofs << "echo \"Prending to PATH: " << sourceDir << "Sim/config\"" << std::endl;
-    ofs << "export PATH=\"" << sourceDir << "Sim/config:${PATH}\"" << std::endl;
+    ofs << "echo \"Prending to PATH: " << sourceDir << "Sim/config/exec\"" << std::endl;
+    ofs << "export PATH=\"" << sourceDir << "Sim/config/exec:${PATH}\"" << std::endl;
 
     ofs.close();
 }
