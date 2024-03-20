@@ -135,7 +135,7 @@ int main( const int argc, const char* argv[] )
                     createBuildFile( sourceDir );
                 }
 
-                cmd = "cmake --build " + buildDir + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON " + buildXtraArgs;
+                cmd = "cmake --build " + buildDir + buildXtraArgs;
 
                 std::cout << "Command: " << cmd << std::endl;
 
@@ -262,7 +262,7 @@ void createRunitExec()
     ofs << "int main(const int argc, const char* argv[])" << std::endl << std::endl;
     ofs << "{" << std::endl;
     ofs << "std::string cmd;" << std::endl;
-    ofs << "cmd = \"python3.9 " << sourceDir << "Sim/Runner/runit.py \";" << std::endl;
+    ofs << "cmd = \"python3 " << sourceDir << "Sim/Runner/runit.py \";" << std::endl;
     ofs << "for ( unsigned int i{1u}; i < argc; ++i )" << std::endl;
     ofs << "{" << std::endl;
     ofs << "\tcmd += std::string(argv[i]) + \" \";" << std::endl;
