@@ -113,56 +113,56 @@ int main( const int argc, const char* argv[] )
     switch ( buildMode )
     {
         case BuildMode::Configure:
+        {
+            createBuildFile( sourceDir );
+
+            cmd = "cmake -S " + sourceDir + " -B " + buildDir + " -DCMAKE_BUILD_TYPE=" + buildType + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON " + buildXtraArgs;
+
+            std::cout << "Command: " << cmd << std::endl;
+
+            system( cmd.c_str() );
+
+            break;
+        }
+        case BuildMode::Build:
+        {
+            if ( buildFileExists( sourceDir ) )
+            {
+                readBuildFile( sourceDir );
+            }
+            else
             {
                 createBuildFile( sourceDir );
-
-                cmd = "cmake -S " + sourceDir + " -B " + buildDir + " -DCMAKE_BUILD_TYPE=" + buildType + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON " + buildXtraArgs;
-
-                std::cout << "Command: " << cmd << std::endl;
-
-                system( cmd.c_str() );
-
-                break;
             }
-        case BuildMode::Build:
-            {
-                if ( buildFileExists( sourceDir ) )
-                {
-                    readBuildFile( sourceDir );
-                }
-                else
-                {
-                    createBuildFile( sourceDir );
-                }
 
-                cmd = "cmake --build " + buildDir + buildXtraArgs;
+            cmd = "cmake --build " + buildDir + buildXtraArgs;
 
-                std::cout << "Command: " << cmd << std::endl;
+            std::cout << "Command: " << cmd << std::endl;
 
-                system( cmd.c_str() );
+            system( cmd.c_str() );
 
-                createRunitExec();
-                createSimLinksToRunitExec();
-                createConfigFile();
+            createRunitExec();
+            createSimLinksToRunitExec();
+            createConfigFile();
 
-                break;
-            }
+            break;
+        }
         case BuildMode::Clean:
-            {
-                    std::cout << "Clearing build directory: " << sourceDir << "build/" << std::endl;
+        {
+            std::cout << "Clearing build directory: " << sourceDir << "build/" << std::endl;
 
-                    cmd = "rm -rf " + sourceDir + "build/";
-                    system( cmd.c_str() );
+            cmd = "rm -rf " + sourceDir + "build/";
+            system( cmd.c_str() );
 
-                break;
-            }
+            break;
+        }
         case BuildMode::Unset:
         default:
-            {
-                const char* err_msg = "-c or -m or -j needs to be provided";
-                throw std::runtime_error( err_msg );
-                break;
-            }
+        {
+            const char* err_msg = "-c or -m or -j needs to be provided";
+            throw std::runtime_error( err_msg );
+            break;
+        }
     }
 
     return 0;
@@ -295,7 +295,7 @@ void createSimLinksToRunitExec()
         system( cmd.c_str() );
     }
 
-    if ( std::filesystem::is_symlink( ( configDir + "exec" ).c_str()))
+    if ( std::filesystem::is_symlink( ( configDir + "exec" ).c_str() ) )
     {
         cmd = "rm -f " + configDir + "exec";
         system( cmd.c_str() );
@@ -304,7 +304,7 @@ void createSimLinksToRunitExec()
     cmd = "ln -s " + execDir + " " + configDir + "exec";
     system( cmd.c_str() );
 
-    if ( std::filesystem::is_symlink( ( buildDir + "config/runnerLink" ).c_str()))
+    if ( std::filesystem::is_symlink( ( buildDir + "config/runnerLink" ).c_str() ) )
     {
         cmd = "rm -f " + buildDir + "config/runnerLink";
         system( cmd.c_str() );
