@@ -19,8 +19,8 @@ if [ -d ${PREFIX} ]; then
 
     cp buildit.py ${PREFIX}/${INSTALL_DIR}/bin/buildit
 
-    ## add #!/usr/bin/env python to the first line of the script
-    sed -i '1s/^.*$/#!\/usr\/bin\/env python/' ${PREFIX}/${INSTALL_DIR}/bin/buildit
+    ## prepend #!/usr/bin/env python to the first line of the script
+    sed -i '1s/^/#!\/usr\/bin\/env python\n/' ${PREFIX}/${INSTALL_DIR}/bin/buildit
 
     # make the script executable and readable only
     chmod 755 ${PREFIX}/${INSTALL_DIR}/bin/buildit
