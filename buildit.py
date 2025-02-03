@@ -11,7 +11,12 @@ class CMakeCommand:
 
     def run(self, cwd=None):
         print("Running:", " ".join(self.cmd))
-        sp.check_call(self.cmd, cwd=cwd)
+
+        try:
+            sp.check_call(self.cmd, cwd=cwd)
+        except sp.CalledProcessError as e:
+            print(f"Error: Command failed with return code {e.returncode}")
+            sys.exit(1)
 
 
 def find_project_root(start_dir):
